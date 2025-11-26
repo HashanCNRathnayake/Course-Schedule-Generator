@@ -52,71 +52,71 @@ function h($s)
 //     return $rows;
 // }
 
-function csv_to_rows($tmpPath): array
-{
-    $rows = [];
-    if (($fh = fopen($tmpPath, 'r')) === false) return $rows;
+// function csv_to_rows($tmpPath): array
+// {
+//     $rows = [];
+//     if (($fh = fopen($tmpPath, 'r')) === false) return $rows;
 
-    $headerFound = false;
-    $classIdx = -1; // will hold the index of "Class Type" once we see the header
+//     $headerFound = false;
+//     $classIdx = -1; // will hold the index of "Class Type" once we see the header
 
-    while (($cols = fgetcsv($fh, 0, ',', '"', "\\")) !== false) {
-        $cols = array_map('trim', $cols);
+//     while (($cols = fgetcsv($fh, 0, ',', '"', "\\")) !== false) {
+//         $cols = array_map('trim', $cols);
 
-        // Find the header row and map the "Class Type" column by name
-        if (!$headerFound) {
-            if (isset($cols[0], $cols[1], $cols[2], $cols[3])) {
-                $c0 = strtolower($cols[0]);
-                $c1 = strtolower($cols[1]);
-                $c2 = strtolower($cols[2]);
-                $c3 = strtolower($cols[3]);
+//         // Find the header row and map the "Class Type" column by name
+//         if (!$headerFound) {
+//             if (isset($cols[0], $cols[1], $cols[2], $cols[3])) {
+//                 $c0 = strtolower($cols[0]);
+//                 $c1 = strtolower($cols[1]);
+//                 $c2 = strtolower($cols[2]);
+//                 $c3 = strtolower($cols[3]);
 
-                if (
-                    str_contains($c0, 'session') &&
-                    str_contains($c1, 'type') &&
-                    str_contains($c2, 'details') &&
-                    (str_contains($c3, 'duration') || str_contains($c3, 'hrs'))
-                ) {
-                    // locate "Class Type" header anywhere in this row (e.g., column N)
-                    foreach ($cols as $i => $h) {
-                        $h = strtolower($h);
-                        if (str_contains($h, 'class') && str_contains($h, 'type')) {
-                            $classIdx = $i;
-                            break;
-                        }
-                    }
-                    $headerFound = true;
-                    continue; // skip the header row itself
-                }
-            }
-            // still above the table → ignore this row
-            continue;
-        }
+//                 if (
+//                     str_contains($c0, 'session') &&
+//                     str_contains($c1, 'type') &&
+//                     str_contains($c2, 'details') &&
+//                     (str_contains($c3, 'duration') || str_contains($c3, 'hrs'))
+//                 ) {
+//                     // locate "Class Type" header anywhere in this row (e.g., column N)
+//                     foreach ($cols as $i => $h) {
+//                         $h = strtolower($h);
+//                         if (str_contains($h, 'class') && str_contains($h, 'type')) {
+//                             $classIdx = $i;
+//                             break;
+//                         }
+//                     }
+//                     $headerFound = true;
+//                     continue; // skip the header row itself
+//                 }
+//             }
+//             // still above the table → ignore this row
+//             continue;
+//         }
 
-        // After header: read row data
-        $c0 = $cols[0] ?? '';
-        $c1 = $cols[1] ?? '';
-        // Clean details *robustly* and never return empty due to bullets
-        $rawDetails = $cols[2] ?? '';
-        $cleaned    = clean_session_details($rawDetails);
-        // If cleaning somehow empties the string while the raw had content, keep a minimal fallback
-        if ($cleaned === '' && $rawDetails !== '') {
-            $cleaned = trim(preg_replace('/\?+/', ' ', fix_encoding($rawDetails)));
-        }
-        $c2 = $cleaned;
-        $c3 = $cols[3] ?? '';
-        $c4 = ($classIdx >= 0 && isset($cols[$classIdx])) ? $cols[$classIdx] : ''; // Class Type (may be empty if not present)
+//         // After header: read row data
+//         $c0 = $cols[0] ?? '';
+//         $c1 = $cols[1] ?? '';
+//         // Clean details *robustly* and never return empty due to bullets
+//         $rawDetails = $cols[2] ?? '';
+//         $cleaned    = clean_session_details($rawDetails);
+//         // If cleaning somehow empties the string while the raw had content, keep a minimal fallback
+//         if ($cleaned === '' && $rawDetails !== '') {
+//             $cleaned = trim(preg_replace('/\?+/', ' ', fix_encoding($rawDetails)));
+//         }
+//         $c2 = $cleaned;
+//         $c3 = $cols[3] ?? '';
+//         $c4 = ($classIdx >= 0 && isset($cols[$classIdx])) ? $cols[$classIdx] : ''; // Class Type (may be empty if not present)
 
-        // skip completely empty lines
-        if ($c0 === '' && $c1 === '' && $c2 === '' && $c3 === '' && $c4 === '') continue;
+//         // skip completely empty lines
+//         if ($c0 === '' && $c1 === '' && $c2 === '' && $c3 === '' && $c4 === '') continue;
 
-        // Return five values (adds Class Type as the 5th)
-        $rows[] = [$c0, $c1, $c2, $c3, $c4];
-    }
+//         // Return five values (adds Class Type as the 5th)
+//         $rows[] = [$c0, $c1, $c2, $c3, $c4];
+//     }
 
-    fclose($fh);
-    return $rows;
-}
+//     fclose($fh);
+//     return $rows;
+// }
 
 
 /* ===== Normalization helpers ===== */

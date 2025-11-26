@@ -8,11 +8,9 @@ CREATE TABLE IF NOT EXISTS courses (
   KEY idx_course_code (course_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-CREATE TABLE 
-
 -- A “template/header” per uploaded CSV (one per Course+Module+Mode+User)
 CREATE TABLE IF NOT EXISTS session_templates (
-  template_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   course_id VARCHAR(64) NOT NULL,
   course_code VARCHAR(64) NOT NULL,
   module_code VARCHAR(64) NOT NULL,
@@ -20,7 +18,7 @@ CREATE TABLE IF NOT EXISTS session_templates (
   user_id BIGINT UNSIGNED NOT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   last_updated TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (template_id),
+  PRIMARY KEY (id),
   KEY idx_lookup (course_id, module_code, learning_mode, user_id),
   UNIQUE KEY uniq_latest (
     course_id, module_code, learning_mode, user_id, created_at

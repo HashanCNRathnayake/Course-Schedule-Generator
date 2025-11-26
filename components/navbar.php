@@ -45,6 +45,9 @@
                             <a class="nav-link" href="<?= htmlspecialchars($baseUrl) ?>admin/course/master_temp.php">Templates</a>
                         </li>
                         <li class="nav-item">
+                            <a class="nav-link" href="<?= htmlspecialchars($baseUrl) ?>admin/holidays_master.php">Holidays</a>
+                        </li>
+                        <li class="nav-item">
                             <a class="nav-link" href="<?= htmlspecialchars($baseUrl) ?>schedule_gen.php">Schedules</a>
                         </li>
                     <?php endif; ?>
@@ -65,7 +68,7 @@
                     <?php endif; ?>
 
                     <li class="nav-item ms-5">
-                        <a href="<?= htmlspecialchars($baseUrl) ?>sso/logout_confirm.php" class="btn btn-danger btn-sm">Logout</a>
+                        <a href="<?= htmlspecialchars($baseUrl) ?>sso/logout.php" class="btn btn-danger btn-sm">Logout</a>
                     </li>
 
 

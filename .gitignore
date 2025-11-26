@@ -5,3 +5,6 @@ dev-test
 /vendor/**
 /vendor/**/*
 /npm
+/backup
+/backup/**
+/backup/**/*
