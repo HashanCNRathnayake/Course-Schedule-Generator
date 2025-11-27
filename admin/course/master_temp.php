@@ -210,7 +210,28 @@ if (isPost('saveTemplate')) {
             $session_mode          = $r['session_mode'] ?? '';
             $topics                = $r['topics'] ?? '';
             $session_day_of_module = $r['session_day_of_module'] ?? '';
-            $hours                 = $r['hours'] ?? '';
+            // $hours                 = $r['hours'] ?? '';
+
+            // --- Normalize hours value ---
+            $rawHours = trim($r['hours'] ?? '');
+
+            if ($rawHours === '') {
+                $hours = '';
+            } elseif ($rawHours == '30') {
+                // exactly 30 minutes
+                $hours = 0.5;
+            } elseif (preg_match('/^(\d+)[\.:](\d{1,2})$/', $rawHours, $m)) {
+                $h = (int)$m[1];
+                $min = (int)$m[2];
+                $hours = $h + ($min / 60);
+            } elseif (preg_match('/(\d+)\s*min/i', $rawHours, $m)) {
+                $min = (int)$m[1];
+                $hours = $min / 60;
+            } else {
+                $hours = (float)$rawHours;
+            }
+
+
             $session_type          = $r['session_type'] ?? '';
             $faculty               = $r['faculty'] ?? '';
 

@@ -148,18 +148,19 @@ function generateScheduleForGrid(
       $isAsync = stripos($row['session_mode'], 'async') !== false;
 
       // ---------- Faculty logic ----------
-      if ($isSync) {
+      if ($isAsync) {
+        // Async session → always NA
+        // $rows[$idx]['faculty'] = 'NA';
+      } else {
         // Sync session → apply mentor name
         $rows[$idx]['faculty'] = $mentorsByModule[$modCode] ?? '';
-      } else {
-        // Async session → faculty empty
-        $rows[$idx]['faculty'] = '';
       }
 
-      // ---------- Time logic ----------
-      $isSync = stripos($row['session_mode'] ?? '', 'sync') !== false;
 
-      if ($isSync) {
+      // ---------- Time logic ----------
+      if ($isAsync) {
+        $rows[$idx]['scheduled_time'] = "";
+      } else {
 
         // Parse start time (HH:MM)
         $startObj = DateTime::createFromFormat('H:i', $startTime);
@@ -180,8 +181,6 @@ function generateScheduleForGrid(
         // Final time format A: 12:20 - 15:20
         $rows[$idx]['scheduled_time'] =
           $startObj->format("H:i") . " - " . $endObj->format("H:i");
-      } else {
-        $rows[$idx]['scheduled_time'] = "";
       }
 
       $lastDateUsed = clone $assignedDate;
@@ -741,7 +740,7 @@ require __DIR__ . '/components/navbar.php';
                       <th class="short_col2">Faculty Name</th>
                       <th class="short_col2">Date</th>
                       <th class="short_col2">Day</th>
-                      <th class="short_col2">Time</th>
+                      <th class="short_col2">Time (HH:MM)</th>
                     </tr>
                   </thead>
 
@@ -770,13 +769,13 @@ require __DIR__ . '/components/navbar.php';
                               name="edit_start[<?= $modCode ?>][<?= $sessionNumber ?>]"
                               class="form-control form-control-sm time-input"
                               value="<?= isset($r['scheduled_time']) ? explode(' - ', $r['scheduled_time'])[0] : '' ?>"
-                              placeholder="Start (HH:MM)">
+                              placeholder="Start">
 
                             <input type="text"
                               name="edit_end[<?= $modCode ?>][<?= $sessionNumber ?>]"
                               class="form-control form-control-sm time-input"
                               value="<?= isset($r['scheduled_time']) ? explode(' - ', $r['scheduled_time'])[1] ?? '' : '' ?>"
-                              placeholder="End (HH:MM)">
+                              placeholder="End">
                           </div>
                         </td>
                       </tr>
