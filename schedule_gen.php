@@ -158,30 +158,37 @@ function generateScheduleForGrid(
 
 
       // ---------- Time logic ----------
-      if ($isAsync) {
-        $rows[$idx]['scheduled_time'] = "";
-      } else {
+      $modeLower = strtolower($row['session_mode'] ?? '');
 
-        // Parse start time (HH:MM)
+      if (strpos($modeLower, 'as-async') !== false) {
+
+        // AS-Async → 08:00 - 23:59
+        $rows[$idx]['scheduled_time'] = "08:00 - 23:59";
+      } elseif (strpos($modeLower, 'as-sync') !== false) {
+
+        // AS-Sync → 08:00 - 22:00
+        $rows[$idx]['scheduled_time'] = "08:00 - 22:00";
+      } elseif (!$isAsync) {
+
+        // Normal Sync session: calculate from start_time + duration
         $startObj = DateTime::createFromFormat('H:i', $startTime);
         if (!$startObj) {
           throw new Exception("Invalid start time format. Must be HH:MM (24h).");
         }
 
-        // Duration is in hours (decimal)
         $durationHours = floatval($row['hours'] ?? 0);
-
-        // Convert hours → minutes
         $minutes = (int) round($durationHours * 60);
-
-        // Create end time
         $endObj = clone $startObj;
         $endObj->modify("+{$minutes} minutes");
 
-        // Final time format A: 12:20 - 15:20
         $rows[$idx]['scheduled_time'] =
           $startObj->format("H:i") . " - " . $endObj->format("H:i");
+      } else {
+
+        // Normal Async session
+        $rows[$idx]['scheduled_time'] = "SAMPLE";
       }
+
 
       $lastDateUsed = clone $assignedDate;
       $lastSod      = $sod;
@@ -577,7 +584,7 @@ require __DIR__ . '/components/navbar.php';
           </div>
 
           <div class="col-md-3">
-            <label class="form-label">Session Start Time</label>
+            <label class="form-label">Sync Session Start Time</label>
             <input type="time" name="start_time" class="form-control form-control-sm" value="<?= h($meta['start_time'] ?? '') ?>" required>
           </div>
 
@@ -734,13 +741,15 @@ require __DIR__ . '/components/navbar.php';
                   <thead>
                     <tr>
                       <th class="short_col text-center">No</th>
-                      <th class="">Session Mode</th>
+                      <!-- <th class="">Session Mode</th> -->
+                      <th class="short_col2">Mode</th>
                       <th class="details_col">Session Details</th>
-                      <th>Duration [h]</th>
+                      <th>Hours</th>
+                      <!-- <th>Duration [h]</th> -->
                       <th class="short_col2">Faculty Name</th>
                       <th class="short_col2">Date</th>
                       <th class="short_col2">Day</th>
-                      <th class="short_col2">Time (HH:MM)</th>
+                      <th class="">Time (HH:MM)</th>
                     </tr>
                   </thead>
 
@@ -750,7 +759,16 @@ require __DIR__ . '/components/navbar.php';
                         <td class="short_col text-center"><?= $sessionNumber++ ?></td>
                         <td><?= h($r['session_mode']) ?></td>
                         <td class="preline"><?= nl2br(h($r['topics'])) ?></td>
-                        <td><?= h($r['hours']) ?></td>
+                        <td>
+                          <?php
+                          $h = $r['hours'];
+                          // remove .0 but keep decimals like .5
+                          if (strpos($h, '.') !== false) {
+                            $h = rtrim(rtrim($h, '0'), '.');
+                          }
+                          echo h($h);
+                          ?>
+                        </td>
                         <td><?= h($r['faculty']) ?></td>
                         <td>
                           <input type="text" name="edit_date[<?= $modCode ?>][<?= $sessionNumber ?>]"
@@ -763,19 +781,36 @@ require __DIR__ . '/components/navbar.php';
                             value="<?= h($r['scheduled_day'] ?? '') ?>" readonly>
                         </td>
 
-                        <td class="short_col2">
-                          <div class=" d-flex flex-row justify-content-center align-items-center">
-                            <input type="text"
-                              name="edit_start[<?= $modCode ?>][<?= $sessionNumber ?>]"
-                              class="form-control form-control-sm time-input"
-                              value="<?= isset($r['scheduled_time']) ? explode(' - ', $r['scheduled_time'])[0] : '' ?>"
-                              placeholder="Start">
+                        <td class="">
+                          <div class="d-flex flex-column justify-content-center align-items-center">
+                            <?php
+                            // show SAMPLE if async (non sync, non AS-async, non AS-sync)
+                            $modeLower = strtolower($r['session_mode'] ?? '');
+                            $isAsyncFront = strpos($modeLower, 'async') !== false;
+                            $isASAsyncFront = strpos($modeLower, 'as-async') !== false;
+                            $isASSyncFront = strpos($modeLower, 'as-sync') !== false;
 
-                            <input type="text"
-                              name="edit_end[<?= $modCode ?>][<?= $sessionNumber ?>]"
-                              class="form-control form-control-sm time-input"
-                              value="<?= isset($r['scheduled_time']) ? explode(' - ', $r['scheduled_time'])[1] ?? '' : '' ?>"
-                              placeholder="End">
+                            if ($isAsyncFront && !$isASAsyncFront && !$isASSyncFront):
+                            ?>
+                              <div class="small text-muted mt-1 text-center">Before Next Sync Session</div>
+                            <?php endif; ?>
+
+
+                            <div class="d-flex flex-row w-100">
+                              <input type="text"
+                                class="form-control form-control-sm time-input"
+                                value="<?= isset($r['scheduled_time']) ? explode(' - ', $r['scheduled_time'])[0] : '' ?>"
+                                placeholder="Start">
+
+                              ～
+
+                              <input type="text"
+                                class="form-control form-control-sm time-input ms-1"
+                                value="<?= isset($r['scheduled_time']) ? explode(' - ', $r['scheduled_time'])[1] ?? '' : '' ?>"
+                                placeholder="End">
+                            </div>
+
+
                           </div>
                         </td>
                       </tr>

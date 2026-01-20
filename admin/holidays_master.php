@@ -485,7 +485,7 @@ require __DIR__ . '/../components/navbar.php';
 
 <body class="p-4">
     <div class="container">
-        <h2 class="mb-4">Holiday Master</h2>
+        <h4 class="mb-4">Holiday Master</h4>
 
         <?php if (!empty($statusMsg)) echo $statusMsg; ?>
 
@@ -511,10 +511,10 @@ require __DIR__ . '/../components/navbar.php';
             </div>
         </form>
 
-        <div class="d-flex justify-content-between align-items-center mb-2">
+        <div class="d-flex justify-content-start align-items-center mb-2">
             <h5 class="m-0">Saved Holidays (<?= htmlspecialchars($COUNTRIES[$selected]) ?> — <?= htmlspecialchars($selected) ?>)</h5>
-            <button id="addRowBtn" class="btn btn-success btn-sm">
-                ➕ Add Holiday
+            <button id="addRowBtn" class="btn btn-success btn-sm ms-3">
+                Add Holiday
             </button>
         </div>
 
@@ -522,22 +522,31 @@ require __DIR__ . '/../components/navbar.php';
             <table class="table table-bordered table-sm align-middle" id="holidaysTable">
                 <thead class="table-light">
                     <tr>
-                        <th style="width:70px;">ID</th>
+                        <th style="width:70px;">No.</th>
+                        <!-- <th style="width:70px;">ID</th> -->
                         <th style="width:260px;">Country</th>
                         <th style="width:160px;">Date</th>
+                        <th style="width:140px;">Day</th>
                         <th>Name</th>
                         <th style="width:120px;">Source</th>
                         <th style="width:220px;">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php if ($holidays): foreach ($holidays as $h): ?>
+                    <?php if ($holidays):
+                        $i = 1;
+                        foreach ($holidays as $h): ?>
                             <tr data-id="<?= (int)$h['id'] ?>">
-                                <td class="cell-id"><?= (int)$h['id'] ?></td>
+                                <td class="cell-no"><?= $i++ ?></td>
+                                <!-- <td class="cell-id"><?= (int)$h['id'] ?></td> -->
                                 <td class="cell-country" data-value="<?= htmlspecialchars($h['country_code']) ?>">
                                     <?= htmlspecialchars($COUNTRIES[$h['country_code']] ?? $h['country_code']) ?> (<?= htmlspecialchars($h['country_code']) ?>)
                                 </td>
                                 <td class="cell-date" data-value="<?= htmlspecialchars($h['hdate']) ?>"><?= htmlspecialchars($h['hdate']) ?></td>
+                                <td class="cell-day">
+                                    <?= date('l', strtotime($h['hdate'])) ?>
+                                </td>
+
                                 <td class="cell-name" data-value="<?= htmlspecialchars($h['name']) ?>"><?= htmlspecialchars($h['name']) ?></td>
                                 <td class="cell-source"><?= htmlspecialchars($h['source']) ?></td>
                                 <td class="cell-actions">
@@ -548,7 +557,7 @@ require __DIR__ . '/../components/navbar.php';
                         <?php endforeach;
                     else: ?>
                         <tr>
-                            <td colspan="6" class="text-center text-muted">No holidays found.</td>
+                            <td colspan="7" class="text-center text-muted">No holidays found.</td>
                         </tr>
                     <?php endif; ?>
                 </tbody>
@@ -623,69 +632,6 @@ require __DIR__ . '/../components/navbar.php';
                 location.reload();
             }
 
-            // Save
-            // if (btn.classList.contains('btn-save')) {
-            //     const id = tr.dataset.id || '';
-            //     const cc = tr.querySelector('.cell-country select').value;
-            //     const hdate = tr.querySelector('.cell-date input').value;
-            //     const name = tr.querySelector('.cell-name input').value;
-
-            //     const form = new FormData();
-            //     form.append('action', 'update');
-            //     form.append('id', id);
-            //     form.append('country_code', cc);
-            //     form.append('hdate', hdate);
-            //     form.append('name', name);
-
-            //     const res = await fetch('', {
-            //         method: 'POST',
-            //         body: form
-            //     });
-            //     const data = await res.json();
-            //     if (data.ok) {
-            //         const label = tr.querySelector('.cell-country select').selectedOptions[0].textContent.replace(/\s+\(\w+\)$/, '');
-            //         fromEditRow(tr, {
-            //             country_code: cc,
-            //             country_label: label,
-            //             hdate: hdate,
-            //             name: name
-            //         });
-            //     } else {
-            //         alert('Save failed: ' + (data.error || 'unknown error'));
-            //     }
-            // }
-
-            // if (btn.classList.contains('btn-save')) {
-            //     const id = tr.dataset.id || '';
-            //     const cc = tr.querySelector('.cell-country select').value;
-            //     const hdate = tr.querySelector('.cell-date input').value;
-            //     const name = tr.querySelector('.cell-name input').value;
-
-            //     const form = new FormData();
-            //     form.append('action', 'update');
-            //     form.append('id', id);
-            //     form.append('country_code', cc);
-            //     form.append('hdate', hdate);
-            //     form.append('name', name);
-
-            //     const res = await fetch('', {
-            //         method: 'POST',
-            //         body: form
-            //     });
-            //     const data = await res.json();
-
-            //     if (data.ok) {
-            //         // 🔥 FINAL WORKING SOLUTION
-            //         const url = new URL(window.location.href);
-            //         url.searchParams.set('country_code', cc);
-            //         url.searchParams.delete('fetch');
-            //         window.location.href = url.toString();
-            //         return; // IMPORTANT
-            //     } else {
-            //         alert('Save failed: ' + (data.error || 'unknown error'));
-            //     }
-            // }
-
             if (btn.classList.contains('btn-save')) {
                 const id = tr.dataset.id || '';
                 const cc = tr.querySelector('.cell-country select').value;
@@ -704,12 +650,16 @@ require __DIR__ . '/../components/navbar.php';
                     body: form
                 });
                 const data = await res.json();
+
                 if (data.ok) {
                     // ✅ RELOAD SAME PAGE WITH SAME COUNTRY
                     const url = new URL(window.location.href);
                     url.searchParams.set('country_code', cc);
                     url.searchParams.delete('fetch');
                     window.location.href = url.toString();
+                    setTimeout(() => window.location.reload(), 200);
+                    console.log('data-oki');
+
 
                 } else {
                     alert('Save failed: ' + (data.error || 'unknown error'));
@@ -741,24 +691,28 @@ require __DIR__ . '/../components/navbar.php';
         });
 
         // Add new row
-        document.getElementById('addRowBtn').addEventListener('click', () => {
-            const tbody = document.querySelector('#holidaysTable tbody');
-            const tr = document.createElement('tr');
-            tr.classList.add('row-editing');
-            tr.innerHTML = `
-    <td class="cell-id">—</td>
-    <td class="cell-country"><select class="form-select form-select-sm"><?= renderCountryOptions($COUNTRIES, $selected) ?></select></td>
-    <td class="cell-date"><input type="date" class="form-control form-control-sm"></td>
-    <td class="cell-name"><input type="text" class="form-control form-control-sm" placeholder="Holiday name"></td>
-    <td class="cell-source">MANUAL</td>
-    <td class="cell-actions">
-      <button class="btn btn-sm btn-success btn-add-save">Save</button>
-      <button class="btn btn-sm btn-secondary btn-add-cancel">Cancel</button>
-    </td>
-  `;
-            tbody.prepend(tr);
-        });
+        const addBtn = document.getElementById('addRowBtn');
 
+        if (addBtn) {
+            addBtn.addEventListener('click', () => {
+                const tbody = document.querySelector('#holidaysTable tbody');
+                const tr = document.createElement('tr');
+                tr.classList.add('row-editing');
+                tr.innerHTML = `
+                <td class="cell-id">—</td>
+                <td class="cell-country"><select class="form-select form-select-sm"><?= renderCountryOptions($COUNTRIES, $selected) ?></select></td>
+                <td class="cell-date"><input type="date" class="form-control form-control-sm"></td>
+                <td class="cell-day"></td>
+                <td class="cell-name"><input type="text" class="form-control form-control-sm" placeholder="Holiday name"></td>
+                <td class="cell-source">MANUAL</td>
+                <td class="cell-actions">
+                <button class="btn btn-sm btn-success btn-add-save">Save</button>
+                <button class="btn btn-sm btn-secondary btn-add-cancel">Cancel</button>
+                </td>
+            `;
+                tbody.prepend(tr);
+            });
+        }
         // Add row save / cancel
         document.addEventListener('click', async (e) => {
             const btn = e.target.closest('button');
@@ -802,6 +756,8 @@ require __DIR__ . '/../components/navbar.php';
         <button class="btn btn-sm btn-outline-primary btn-edit">Edit</button>
         <button class="btn btn-sm btn-outline-danger btn-delete">Delete</button>
       `;
+                    setTimeout(() => window.location.reload(), 200);
+                    console.log('data-oki');
                 } else {
                     alert('Add failed: ' + (data.error || 'unknown error'));
                 }

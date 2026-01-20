@@ -60,24 +60,6 @@ require __DIR__ . '/components/navbar.php';
 
     </div>
     <script>
-        function enableSubmit() {
-            document.getElementById('submit-btn').disabled = false;
-        }
-
-        function togglePassword() {
-            const pwdInput = document.getElementById('password');
-            const icon = document.getElementById('toggleIcon');
-
-            if (pwdInput.type === 'password') {
-                pwdInput.type = 'text';
-                icon.classList.remove('fa-eye');
-                icon.classList.add('fa-eye-slash');
-            } else {
-                pwdInput.type = 'password';
-                icon.classList.remove('fa-eye-slash');
-                icon.classList.add('fa-eye');
-            }
-        }
     </script>
 
 

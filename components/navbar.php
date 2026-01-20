@@ -12,12 +12,6 @@
         display: none;
         /* Chrome, Safari, Opera */
     }
-
-
-    .nav-btn {
-        background-color: white;
-        padding: 2px 5px;
-    }
 </style>
 
 <nav class="navbar navbar-expand-lg mb-2">
@@ -33,48 +27,77 @@
         </button>
 
         <div class="collapse navbar-collapse" id="navbarNavDropdown">
-            <ul class="navbar-nav ms-auto mb-2 mb-lg-0 align-items-center">
-                <?php if ($me): ?>
-                    <?php if (
-                        hasRole($conn, 'User') ||
-                        hasRole($conn, 'Admin') ||
-                        hasRole($conn, 'SuperAdmin')
-                    ): ?>
-
-                        <li class="nav-item">
-                            <a class="nav-link" href="<?= htmlspecialchars($baseUrl) ?>admin/course/master_temp.php">Templates</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="<?= htmlspecialchars($baseUrl) ?>admin/holidays_master.php">Holidays</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="<?= htmlspecialchars($baseUrl) ?>schedule_gen.php">Schedules</a>
-                        </li>
-                    <?php endif; ?>
-                <?php endif; ?>
-                <li class="nav-item">
-                    <a class="nav-link" href="<?= htmlspecialchars($baseUrl) ?>index.php">Schedules List</a>
-                </li>
-                <!-- <li class="nav-item">
-                    <a class="nav-link" href="<?= htmlspecialchars($baseUrl) ?>admin/session_plans/generate.php">Session gen</a>
-                </li> -->
+            <ul class="navbar-nav ms-auto mb-2 mb-lg-0 align-items-center gap-1">
 
                 <?php if ($me): ?>
-                    <?php if (hasRole($conn, 'Admin')): ?>
-                        <li class="nav-item">
-                            <a class="nav-link" href="<?= htmlspecialchars($baseUrl) ?>admin/users.php">Manage Users</a>
-                        </li>
 
-                    <?php endif; ?>
-
-                    <li class="nav-item ms-5">
-                        <a href="<?= htmlspecialchars($baseUrl) ?>sso/logout.php" class="btn btn-danger btn-sm">Logout</a>
+                    <!-- ================= SCHEDULE SECTION ================= -->
+                    <li class="nav-item">
+                        <a class="nav-link" href="<?= htmlspecialchars($baseUrl) ?>schedule_gen.php">
+                            Create Schedule
+                        </a>
                     </li>
 
+                    <li class="nav-item">
+                        <a class="nav-link" href="<?= htmlspecialchars($baseUrl) ?>index.php">
+                            Schedules
+                        </a>
+                    </li>
+
+                    <li class="nav-item">
+                        <a class="nav-link" href="<?= htmlspecialchars($baseUrl) ?>admin/course/">
+                            Manage Schedule
+                        </a>
+                    </li>
+
+                    <?php if (hasRole($conn, 'Admin') || hasRole($conn, 'SuperAdmin')): ?>
+
+                        <!-- divider -->
+                        <li class="nav-item text-muted">|</li>
+
+                        <!-- ================= ADMIN SECTION ================= -->
+                        <li class="nav-item">
+                            <a class="nav-link" href="<?= htmlspecialchars($baseUrl) ?>admin/course/master_temp.php">
+                                Import Templates
+                            </a>
+                        </li>
+
+                        <li class="nav-item">
+                            <a class="nav-link" href="<?= htmlspecialchars($baseUrl) ?>admin/course/templates_manage.php">
+                                Templates
+                            </a>
+                        </li>
+
+                        <li class="nav-item">
+                            <a class="nav-link" href="<?= htmlspecialchars($baseUrl) ?>admin/holidays_master.php">
+                                Holidays
+                            </a>
+                        </li>
+
+                        <li class="nav-item">
+                            <a class="nav-link" href="<?= htmlspecialchars($baseUrl) ?>admin/users.php">
+                                Users
+                            </a>
+                        </li>
+
+                    <?php endif; ?>
+
+                    <!-- ================= LOGOUT ================= -->
+                    <li class="nav-item ms-4">
+                        <a href="<?= htmlspecialchars($baseUrl) ?>sso/logout.php"
+                            class="btn btn-danger btn-sm">
+                            Logout
+                        </a>
+                    </li>
 
                 <?php else: ?>
-                    <li class="nav-item  ms-5">
-                        <a href="<?= htmlspecialchars($baseUrl) ?>login.php" class="btn btn-primary btn-sm">Login</a>
+
+                    <!-- ================= LOGIN ================= -->
+                    <li class="nav-item ms-4">
+                        <a href="<?= htmlspecialchars($baseUrl) ?>login.php"
+                            class="btn btn-primary btn-sm">
+                            Login
+                        </a>
                     </li>
 
                 <?php endif; ?>

@@ -239,9 +239,56 @@ function ymd(DateTime $d)
 }
 
 /* ===== Courses API sync into `courses` ===== */
+// function upsert_courses_from_api(mysqli $conn): array
+// {
+//     $url = "https://ce.educlaas.com/product-app/views/courses/api/claas-ai-app/admin/get-course-information";
+//     $ch = curl_init($url);
+//     curl_setopt_array($ch, [
+//         CURLOPT_RETURNTRANSFER => true,
+//         CURLOPT_FOLLOWLOCATION => true,
+//         CURLOPT_CONNECTTIMEOUT => 10,
+//         CURLOPT_TIMEOUT        => 20,
+//         CURLOPT_HTTPHEADER     => ['Accept: application/json'],
+//     ]);
+//     $res  = curl_exec($ch);
+//     $err  = curl_error($ch);
+//     $http = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+//     curl_close($ch);
+
+//     if ($err || $http < 200 || $http >= 300) {
+//         return ['ok' => false, 'msg' => "API error ($http): " . ($err ?: 'unexpected response')];
+//     }
+//     $json = json_decode($res, true);
+//     if (!is_array($json) || empty($json['data']) || !is_array($json['data'])) {
+//         return ['ok' => false, 'msg' => 'API payload missing or malformed'];
+//     }
+
+//     $stmt = $conn->prepare("
+//         INSERT INTO courses (course_id, course_code, course_title_external)
+//         VALUES (?,?,?)
+//         ON DUPLICATE KEY UPDATE
+//           course_code = VALUES(course_code),
+//           course_title_external = VALUES(course_title_external)
+//     ");
+//     if (!$stmt) return ['ok' => false, 'msg' => 'DB prepare failed: ' . $conn->error];
+
+//     $count = 0;
+//     foreach ($json['data'] as $row) {
+//         $course_id  = (string)($row['course_id'] ?? '');
+//         $course_code = (string)($row['course_code'] ?? '');
+//         $title_ext   = (string)($row['course_title_external'] ?? '');
+//         if ($course_id === '' || $course_code === '' || $title_ext === '') continue;
+//         $stmt->bind_param("sss", $course_id, $course_code, $title_ext);
+//         if ($stmt->execute()) $count++;
+//     }
+//     $stmt->close();
+//     return ['ok' => true, 'msg' => "Courses saved/updated: $count", 'count' => $count];
+// }
+
 function upsert_courses_from_api(mysqli $conn): array
 {
     $url = "https://ce.educlaas.com/product-app/views/courses/api/claas-ai-app/admin/get-course-information";
+
     $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
@@ -250,6 +297,7 @@ function upsert_courses_from_api(mysqli $conn): array
         CURLOPT_TIMEOUT        => 20,
         CURLOPT_HTTPHEADER     => ['Accept: application/json'],
     ]);
+
     $res  = curl_exec($ch);
     $err  = curl_error($ch);
     $http = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -258,32 +306,66 @@ function upsert_courses_from_api(mysqli $conn): array
     if ($err || $http < 200 || $http >= 300) {
         return ['ok' => false, 'msg' => "API error ($http): " . ($err ?: 'unexpected response')];
     }
+
     $json = json_decode($res, true);
     if (!is_array($json) || empty($json['data']) || !is_array($json['data'])) {
-        return ['ok' => false, 'msg' => 'API payload missing or malformed'];
+        // IMPORTANT: Do NOT touch DB status if API is bad
+        return ['ok' => false, 'msg' => 'API payload missing or empty. Status unchanged.'];
     }
 
-    $stmt = $conn->prepare("
-        INSERT INTO courses (course_id, course_code, course_title_external)
-        VALUES (?,?,?)
-        ON DUPLICATE KEY UPDATE
-          course_code = VALUES(course_code),
-          course_title_external = VALUES(course_title_external)
-    ");
-    if (!$stmt) return ['ok' => false, 'msg' => 'DB prepare failed: ' . $conn->error];
+    $apiCourses = $json['data'];
 
-    $count = 0;
-    foreach ($json['data'] as $row) {
-        $course_id  = (string)($row['course_id'] ?? '');
-        $course_code = (string)($row['course_code'] ?? '');
-        $title_ext   = (string)($row['course_title_external'] ?? '');
-        if ($course_id === '' || $course_code === '' || $title_ext === '') continue;
-        $stmt->bind_param("sss", $course_id, $course_code, $title_ext);
-        if ($stmt->execute()) $count++;
+    $conn->begin_transaction();
+
+    try {
+        // 1️⃣ Mark all courses as inactive FIRST
+        $conn->query("UPDATE courses SET status = 'inactive'");
+
+        // 2️⃣ Prepare upsert statement (reactivates existing + inserts new)
+        $stmt = $conn->prepare("
+            INSERT INTO courses
+                (course_id, course_code, course_title_external, status)
+            VALUES (?,?,?,'active')
+            ON DUPLICATE KEY UPDATE
+                course_code = VALUES(course_code),
+                course_title_external = VALUES(course_title_external),
+                status = 'active'
+        ");
+
+        if (!$stmt) {
+            throw new Exception('DB prepare failed: ' . $conn->error);
+        }
+
+        $count = 0;
+
+        foreach ($apiCourses as $row) {
+            $course_id   = (string)($row['course_id'] ?? '');
+            $course_code = (string)($row['course_code'] ?? '');
+            $title_ext   = (string)($row['course_title_external'] ?? '');
+
+            if ($course_id === '' || $course_code === '' || $title_ext === '') {
+                continue;
+            }
+
+            $stmt->bind_param("sss", $course_id, $course_code, $title_ext);
+            $stmt->execute();
+            $count++;
+        }
+
+        $stmt->close();
+        $conn->commit();
+
+        return [
+            'ok'    => true,
+            'msg'   => "Courses synced. Active: $count | Others set inactive.",
+            'count' => $count
+        ];
+    } catch (Throwable $e) {
+        $conn->rollback();
+        return ['ok' => false, 'msg' => 'Sync failed: ' . $e->getMessage()];
     }
-    $stmt->close();
-    return ['ok' => true, 'msg' => "Courses saved/updated: $count", 'count' => $count];
 }
+
 
 /**
  * @param array $rows          CSV first 4 columns (for count)

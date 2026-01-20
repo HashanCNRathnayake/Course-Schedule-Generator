@@ -14,7 +14,7 @@ $conn = new mysqli(
     $_ENV['DB_USER'] ?? 'root',
     $_ENV['DB_PASS'] ?? '',
     $_ENV['DB_NAME'] ?? '',
-    (int)($_ENV['DB_PORT'] ?? 3306)
+    (int)($_ENV['DB_PORT'] ?? 3307)
 );
 if ($conn->connect_errno) {
     die("Database connection failed: " . $conn->connect_error);

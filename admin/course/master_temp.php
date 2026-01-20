@@ -27,13 +27,7 @@ $userId   = (int)($_SESSION['auth']['user_id'] ?? 0);
 
 $flash = $_SESSION['flash'] ?? null;
 unset($_SESSION['flash']);
-
-// layout includes (optional – comment out if you don't use them)
-if (is_file(__DIR__ . '/../../components/header.php')) require __DIR__ . '/../../components/header.php';
-if (is_file(__DIR__ . '/../../components/navbar.php')) require __DIR__ . '/../../components/navbar.php';
 require __DIR__ . '/schedule_lib.php';
-
-
 
 // Refresh courses from API
 if (isPost('refresh')) {
@@ -46,86 +40,19 @@ if (isPost('refresh')) {
     header('Location: ' . $_SERVER['PHP_SELF']);
     exit;
 }
-
-function sanitize_text(string $text): string
-{
-    // Replace strange symbols or broken encodings with spaces
-    $text = iconv('UTF-8', 'UTF-8//IGNORE', $text);
-    $text = preg_replace('/[^\P{C}\n]+/u', ' ', $text); // remove control chars
-    $text = preg_replace('/[�]+/u', ' ', $text); // remove replacement chars
-    $text = preg_replace('/\s{2,}/', ' ', $text); // collapse extra spaces
-    return trim($text);
-}
-
-function csv_to_rows(string $filepath): array
-{
-    if (!file_exists($filepath)) return [];
-
-    $rows = [];
-    setlocale(LC_ALL, 'en_US.UTF-8');
-    ini_set('auto_detect_line_endings', '1');
-
-    if (($handle = fopen($filepath, 'r')) === false) return [];
-
-    // Read header row
-    $header = fgetcsv($handle);
-    if (!$header) return [];
-
-    $header = array_map('trim', $header);
-    $headerLower = array_map('strtolower', $header);
-
-    // Mapping: CSV header name → array key
-    $map = [
-        'session id'              => 'session_id',
-        'session day'             => 'session_day',
-        'session of the day'      => 'session_of_the_day',
-        'session code'            => 'session_code',
-        'session mode'            => 'session_mode',
-        'topics'                  => 'topics',
-        'session day of module'   => 'session_day_of_module',
-        'hours'                   => 'hours',
-        'session type'            => 'session_type',
-        'faculty'                 => 'faculty'
-    ];
-
-    // Find column index for each header
-    $indexes = [];
-    foreach ($map as $csvName => $key) {
-        $idx = array_search(strtolower($csvName), $headerLower);
-        $indexes[$key] = $idx !== false ? $idx : null;
-    }
-
-    // Read data rows
-    while (($data = fgetcsv($handle)) !== false) {
-        if (count(array_filter($data)) == 0) continue;
-
-        $row = [];
-        foreach ($indexes as $key => $idx) {
-            $row[$key] = $idx !== null ? trim($data[$idx] ?? '') : '';
-        }
-
-        $row['topics'] = sanitize_text($row['topics']);
-
-        $rows[] = $row;
-    }
-
-    fclose($handle);
-    return $rows;
-}
-
-
 // Save template + rows
 if (isPost('saveTemplate')) {
     $course_id     = trim($_POST['course_id'] ?? '');
     $course_code   = trim($_POST['course_code'] ?? '');
-    $module_code   = '';
     $learning_mode = trim($_POST['learning_mode_text'] ?? '');
+    $tag           = trim($_POST['template_tag'] ?? '');
 
-    if ($course_id === '' || $course_code === '' || $learning_mode === '') {
-        $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Please select Course, and Mode before saving.'];
+    if ($course_id === '' || $course_code === '' || $learning_mode === '' || $tag === '') {
+        $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Please select Course, Mode and enter Template Tag before saving.'];
         header('Location: ' . $_SERVER['PHP_SELF']);
         exit;
     }
+
 
     if (!isset($_FILES['csvFile']) || !is_uploaded_file($_FILES['csvFile']['tmp_name'])) {
         $_SESSION['flash'] = ['type' => 'danger', 'message' => 'Please upload a CSV file.'];
@@ -133,7 +60,88 @@ if (isPost('saveTemplate')) {
         exit;
     }
 
-    $rows = csv_to_rows($_FILES['csvFile']['tmp_name']);
+    $parsed = csv_to_rows($_FILES['csvFile']['tmp_name']);
+    $header = $parsed['header'];
+    $rows   = $parsed['rows'];
+
+    if (!$rows) {
+        $_SESSION['flash'] = ['type' => 'danger', 'message' => 'No rows detected in CSV.'];
+        header('Location: ' . $_SERVER['PHP_SELF']);
+        exit;
+    }
+
+    // ✅ VALIDATE HERE (before DB transaction)
+    $errors = validate_template_csv($header, $rows);
+    if ($errors) {
+        $_SESSION['flash'] = [
+            'type' => 'danger',
+            'message' => "CSV validation failed:\n- " . implode("\n- ", $errors)
+        ];
+        header('Location: ' . $_SERVER['PHP_SELF']);
+        exit;
+    }
+
+    // ======================
+    // CSV DEBUG (TEMPORARY)
+    // ======================
+    // $DEBUG_CSV = true; // set to false or remove after debugging
+
+    // if ($DEBUG_CSV) {
+    //     header('Content-Type: application/json');
+
+    //     echo json_encode([
+    //         'header_raw' => $header,
+    //         'header_normalized' => array_map(fn($h) => strtolower(trim($h)), $header),
+    //         'row_count' => count($rows),
+    //         'first_5_rows' => array_slice($rows, 0, 5),
+    //     ], JSON_PRETTY_PRINT);
+
+    //     exit; // STOP before DB writes
+    // }
+
+
+    // 🔒 Validate unique tag per course + learning mode
+    $stmtChk = $conn->prepare("
+        SELECT id
+        FROM templates
+        WHERE course_id = ?
+        AND learning_mode = ?
+        AND tag = ?
+        AND deleted_at IS NULL
+        LIMIT 1
+    ");
+    $stmtChk->bind_param("sss", $course_id, $learning_mode, $tag);
+    $stmtChk->execute();
+    $stmtChk->bind_result($existingTemplateId);
+    $exists = $stmtChk->fetch();
+    $stmtChk->close();
+
+    if ($exists) {
+        $_SESSION['flash'] = [
+            'type' => 'danger',
+            'message' => "A template already exists for this Course and Learning Mode with the same Tag. Please use a different Tag."
+        ];
+        header('Location: ' . $_SERVER['PHP_SELF']);
+        exit;
+    }
+
+
+    // ✅ Only after validation passes:
+
+    /* =======================
+    RUN CSV VALIDATIONS
+    ======================= */
+
+
+    if (!empty($errors)) {
+        $_SESSION['flash'] = [
+            'type' => 'danger',
+            'message' => "CSV validation failed:<br>" . implode('<br>', $errors)
+        ];
+        header('Location: ' . $_SERVER['PHP_SELF']);
+        exit;
+    }
+
 
     if (!$rows) {
         $_SESSION['flash'] = ['type' => 'danger', 'message' => 'No rows detected in CSV.'];
@@ -149,11 +157,10 @@ if (isPost('saveTemplate')) {
         $stmt0 = $conn->prepare("
         SELECT id
         FROM templates
-        WHERE course_id=? AND learning_mode=?
-        ORDER BY created_at DESC
+        WHERE course_id=? AND learning_mode=? AND tag=? AND deleted_at IS NULL
         LIMIT 1
     ");
-        $stmt0->bind_param("ss", $course_id, $learning_mode);
+        $stmt0->bind_param("sss", $course_id, $learning_mode, $tag);
         $stmt0->execute();
         $stmt0->bind_result($existingId);
         if ($stmt0->fetch()) {
@@ -182,10 +189,10 @@ if (isPost('saveTemplate')) {
 
             $stmt = $conn->prepare("
             INSERT INTO templates
-                (course_id, learning_mode, created_user, updated_user)
-            VALUES (?,?,?,?)
+            (course_id, learning_mode, tag, created_user, updated_user)
+            VALUES (?,?,?,?,?)
         ");
-            $stmt->bind_param("ssii", $course_id, $learning_mode, $userId, $userId);
+            $stmt->bind_param("sssii", $course_id, $learning_mode, $tag, $userId, $userId);
             $stmt->execute();
             $templateId = (int)$conn->insert_id;
             $stmt->close();
@@ -193,12 +200,24 @@ if (isPost('saveTemplate')) {
 
         // 5) Insert fresh rows (no need for ON DUPLICATE since we deleted old)
         $stmt2 = $conn->prepare("
-        INSERT INTO template_data
-            (template_id, module_code, session_id, session_day, session_of_the_day,
-            session_code, session_mode, topics, session_day_of_module, hours,
-            session_type, faculty)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
-        ");
+            INSERT INTO template_data (
+                template_id,
+                module_code,
+                session_id,
+                session_day,
+                session_of_the_day,
+                session_code,
+                session_mode,
+                delivery_mode,
+                location,
+                session_name,
+                topics,
+                hours,
+                session_type,
+                faculty
+            )
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ");
 
         foreach ($rows as $r) {
             // Adjust indexes based on your CSV structure
@@ -208,9 +227,26 @@ if (isPost('saveTemplate')) {
             $session_of_the_day    = $r['session_of_the_day'] ?? '';
             $session_code          = $r['session_code'] ?? '';
             $session_mode          = $r['session_mode'] ?? '';
-            $topics                = $r['topics'] ?? '';
-            $session_day_of_module = $r['session_day_of_module'] ?? '';
-            // $hours                 = $r['hours'] ?? '';
+            $delivery_mode = $r['delivery_mode'] ?? '';
+            $location      = $r['location'] ?? '';
+            $session_name  = $r['session_name'] ?? '';
+            $topics                = $r['topics'];
+
+
+            $sessionMode  = trim($r['session_mode'] ?? '');
+            $deliveryMode = trim($r['delivery_mode'] ?? '');
+
+            // ✅ AUTO-CALCULATE FACULTY
+            if ($deliveryMode === 'NA') {
+                // Submission / assessment
+                $faculty = 'Learners';
+            } elseif (str_ends_with($sessionMode, '-Sync') && $deliveryMode === 'Online Synchronous') {
+                // Live synchronous sessions
+                $faculty = 'TBA';
+            } else {
+                // Async / non-live sessions
+                $faculty = 'NA';
+            }
 
             // --- Normalize hours value ---
             $rawHours = trim($r['hours'] ?? '');
@@ -233,7 +269,6 @@ if (isPost('saveTemplate')) {
 
 
             $session_type          = $r['session_type'] ?? '';
-            $faculty               = $r['faculty'] ?? '';
 
             $normalized = str_replace(
                 ['–', '—', '‐'], // all types of dashes
@@ -252,7 +287,7 @@ if (isPost('saveTemplate')) {
 
             // Insert each row into template_data
             $stmt2->bind_param(
-                "isisssssssss",
+                "isisssssssssss",
                 $templateId,
                 $module_extracted,
                 $session_id,
@@ -260,19 +295,22 @@ if (isPost('saveTemplate')) {
                 $session_of_the_day,
                 $session_code,
                 $session_mode,
+                $delivery_mode,
+                $location,
+                $session_name,
                 $topics,
-                $session_day_of_module,
                 $hours,
                 $session_type,
                 $faculty
             );
+
             $stmt2->execute();
         }
         $stmt2->close();
 
         $conn->commit();
         $_SESSION['flash'] = ['type' => 'success', 'message' => "Template updated (#$templateId) with " . count($rows) . " rows."];
-        header('Location: ' . $_SERVER['PHP_SELF'] . '/../../../schedule_gen.php');
+        header('Location: ' . $_SERVER['PHP_SELF']);
         exit;
     } catch (Throwable $e) {
         $conn->rollback();
@@ -281,6 +319,169 @@ if (isPost('saveTemplate')) {
         exit;
     }
 }
+
+
+// layout includes (optional – comment out if you don't use them)
+if (is_file(__DIR__ . '/../../components/header.php')) require __DIR__ . '/../../components/header.php';
+if (is_file(__DIR__ . '/../../components/navbar.php')) require __DIR__ . '/../../components/navbar.php';
+
+
+function sanitize_text(string $text): string
+{
+    // Replace strange symbols or broken encodings with spaces
+    $text = iconv('UTF-8', 'UTF-8//IGNORE', $text);
+    $text = preg_replace('/[^\P{C}\n]+/u', ' ', $text); // remove control chars
+    $text = preg_replace('/[�]+/u', ' ', $text); // remove replacement chars
+    $text = preg_replace('/\s{2,}/', ' ', $text); // collapse extra spaces
+    return trim($text);
+}
+
+function csv_to_rows(string $filepath): array
+{
+    if (!file_exists($filepath)) return ['header' => [], 'rows' => []];
+
+    $rows = [];
+    setlocale(LC_ALL, 'en_US.UTF-8');
+    ini_set('auto_detect_line_endings', '1');
+
+    if (($handle = fopen($filepath, 'r')) === false) return ['header' => [], 'rows' => []];
+
+    $header = fgetcsv($handle);
+    if (!$header) return ['header' => [], 'rows' => []];
+
+    $header = array_map('trim', $header);
+    $headerLower = array_map(fn($h) => strtolower(trim($h)), $header);
+
+    // CSV header → internal key
+    $map = [
+        'session id'            => 'session_id',
+        'session code'          => 'session_code',
+        'session day'           => 'session_day',
+        'session of the day'    => 'session_of_the_day',
+        'session type'          => 'session_type',
+        'topics'                => 'topics',
+        'hours'                 => 'hours',
+        'session mode'          => 'session_mode',
+        'delivery mode'         => 'delivery_mode',
+        'location'              => 'location',
+        'session name'          => 'session_name',
+    ];
+
+    $indexes = [];
+    foreach ($map as $csvName => $key) {
+        $idx = array_search(strtolower($csvName), $headerLower, true);
+        $indexes[$key] = ($idx !== false) ? $idx : null;
+    }
+
+    while (($data = fgetcsv($handle)) !== false) {
+        if (count(array_filter($data)) == 0) continue;
+
+        $row = [];
+        foreach ($indexes as $key => $idx) {
+            $row[$key] = $idx !== null ? trim($data[$idx] ?? '') : '';
+        }
+
+        if (isset($row['topics'])) {
+            $row['topics'] = sanitize_text($row['topics']);
+        }
+
+        $rows[] = $row;
+    }
+
+    fclose($handle);
+    return ['header' => $header, 'rows' => $rows];
+}
+
+
+function validate_template_csv(array $header, array $rows): array
+{
+    $errors = [];
+
+    // 1) Header validation (must exist in FIRST ROW)
+    $required = [
+        'Session ID',
+        'Session Code',
+        'Session Day',
+        'Session of the Day',
+        'Session Type',
+        'Topics',
+        'Hours',
+        'Session Mode',
+        'Delivery Mode',
+        'Location',
+        'Session Name',
+    ];
+
+    $headerNorm = array_map(fn($h) => strtolower(trim($h)), $header);
+    $requiredNorm = array_map(fn($h) => strtolower(trim($h)), $required);
+
+    foreach ($requiredNorm as $i => $need) {
+        if (!in_array($need, $headerNorm, true)) {
+            $errors[] = "Missing required column heading: {$required[$i]}";
+        }
+    }
+
+    if ($errors) return $errors; // stop early
+
+    // Allowed values
+    $allowedSessionModes = ['EL-Async', 'FC-Sync', 'MS-Sync', 'MS-Async', 'AS-Async', 'AS-Sync'];
+    $allowedDeliveryModes = ['Online Asynchronous', 'Online Synchronous', 'NA'];
+    $allowedSOTD = ['s1', 's2', 's3'];
+
+    // 2) Row-by-row checks
+    $prevSotd = null;
+    foreach ($rows as $idx => $r) {
+        $rowNo = $idx + 2; // because row 1 is header
+
+        $sotd = strtolower(trim($r['session_of_the_day'] ?? ''));
+        $sessionMode = trim($r['session_mode'] ?? '');
+        $deliveryMode = trim($r['delivery_mode'] ?? '');
+
+        // Session of the Day: value check
+        if ($sotd === '' || !in_array($sotd, $allowedSOTD, true)) {
+            $errors[] = "Row {$rowNo}: Session of the Day must be one of s1/s2/s3 (found '{$r['session_of_the_day']}').";
+        } else {
+            // sequence rules
+            if ($prevSotd === null) {
+                if ($sotd !== 's1') {
+                    $errors[] = "Row {$rowNo}: First Session of the Day must be 's1' (found '{$r['session_of_the_day']}').";
+                }
+            } else {
+                if ($prevSotd === 's1' && !in_array($sotd, ['s1', 's2'], true)) {
+                    $errors[] = "Row {$rowNo}: After 's1', next can only be s1 or s2 (found '{$r['session_of_the_day']}').";
+                }
+                if ($prevSotd === 's2' && !in_array($sotd, ['s3', 's1'], true)) {
+                    $errors[] = "Row {$rowNo}: After 's2', next can only be s3 or restart at s1 (found '{$r['session_of_the_day']}').";
+                }
+                if ($prevSotd === 's3' && $sotd !== 's1') {
+                    $errors[] = "Row {$rowNo}: After 's3', next must restart at s1 (found '{$r['session_of_the_day']}').";
+                }
+            }
+            $prevSotd = $sotd;
+        }
+
+        // Session mode validation
+        if ($sessionMode === '' || !in_array($sessionMode, $allowedSessionModes, true)) {
+            $errors[] = "Row {$rowNo}: Session Mode must be one of " . implode(', ', $allowedSessionModes) . " (found '{$sessionMode}').";
+        }
+
+        // Delivery Mode validation
+        if ($deliveryMode === '' || !in_array($deliveryMode, $allowedDeliveryModes, true)) {
+            $errors[] = "Row {$rowNo}: Delivery Mode must be one of " . implode(', ', $allowedDeliveryModes) . " (found '{$deliveryMode}').";
+        }
+
+        // Stop if too many errors (prevents huge output)
+        if (count($errors) > 30) {
+            $errors[] = "Too many errors. Fix the above and re-upload.";
+            break;
+        }
+    }
+
+    return $errors;
+}
+
+
+
 
 ?>
 
@@ -323,8 +524,20 @@ if (isPost('saveTemplate')) {
         <?php endif; ?>
 
         <div class="d-flex justify-content-between align-items-center mb-3">
-            <h4 class="mb-0">Master: Create Session Template</h4>
-            <form method="post"><button class="btn btn-primary" name="refresh" type="submit">Refresh Course List</button></form>
+            <h4 class="mb-4">Template Master</h4>
+            <div class="d-flex gap-2">
+                <!-- Refresh Button -->
+                <form method="post" class="m-0">
+                    <button class="btn btn-primary" name="refresh" type="submit">
+                        Refresh Course List
+                    </button>
+                </form>
+
+                <!-- Navigation Button -->
+                <a href="courses_master.php" class="btn btn-outline-success">
+                    View All Courses
+                </a>
+            </div>
         </div>
 
         <!-- Course search -->
@@ -354,6 +567,18 @@ if (isPost('saveTemplate')) {
                 <input type="hidden" name="learning_mode_text" id="learning_mode_text">
                 <div id="modeDetails" class="small mt-2"></div>
             </div>
+            <div class="col-md-6">
+                <label class="form-label">Template Tag / Description</label>
+                <input type="text"
+                    class="form-control"
+                    name="template_tag"
+                    placeholder="e.g. v1, rev-2026-01"
+                    required>
+                <div class="form-text">
+                    Used for versioning and identification
+                </div>
+            </div>
+
 
             <div class="col-md-8">
                 <label class="form-label">Upload CSV</label>
