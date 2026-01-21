@@ -516,7 +516,7 @@ require __DIR__ . '/components/navbar.php';
       </div>
     <?php endif; ?>
 
-    <h4 class="mb-3">Generate Schedules</h4>
+    <h4 class="mb-3">Select Course, Mode & Modules</h4>
 
     <!-- Course Search + Mode + Modules Order -->
     <form method="post" class="mb-4">
@@ -524,9 +524,9 @@ require __DIR__ . '/components/navbar.php';
       <div class="row g-2 justify-content-start align-items-start">
 
         <!-- Course search -->
-        <div class="col-12 position-relative">
+        <div class="col-6 position-relative">
           <div class="input-group">
-            <input type="text" id="search" class="form-control shadow-none border-secondary border-end-0 me-1" placeholder="<?= $selected['course_title'] ? h($selected['course_title']) : 'Search Templates' ?>">
+            <input type="text" id="search" class="form-control shadow-none border-secondary border-end-0 me-1" placeholder="<?= $selected['course_title'] ? h($selected['course_title']) : 'Search Courses' ?>">
             <button type="button" id="clearSearch" class="btn btn-outline-secondary">&times;</button>
           </div>
           <div id="results" class="list-group"></div>
@@ -541,11 +541,11 @@ require __DIR__ . '/components/navbar.php';
         <input type="hidden" name="course_id" id="course_id" value="<?= h($selected['course_id']) ?>">
         <input type="hidden" name="course_code" id="course_code" value="<?= h($selected['course_code']) ?>">
         <input type="hidden" name="course_title" id="course_title" value="<?= h($selected['course_title']) ?>">
+        <input type="hidden" name="template_id" id="template_id"
+          value="<?= h($_SESSION['selected']['template_id'] ?? '') ?>">
 
-        <!-- Mode select -->
-        <div class="col-md-3">
-          <div id="modeDetails" class="small"></div>
-        </div>
+        <input type="hidden" name="learning_mode" id="learning_mode"
+          value="<?= h($_SESSION['selected']['learning_mode'] ?? '') ?>">
 
         <!-- Modules list (ordered) -->
         <div class="col-12 mt-3">
@@ -881,9 +881,9 @@ require __DIR__ . '/components/navbar.php';
           data-learning-mode="${r.learning_mode}">
           <div>
             <strong>[${r.course_code}]</strong> ${r.course_title_external}
-            <span class="small text-muted">
+            <div class="small text-muted">
               ${r.tag} · ${r.learning_mode}
-            </span>
+            </div>
           </div>
         </button>
       `).join('');
@@ -946,126 +946,6 @@ require __DIR__ . '/components/navbar.php';
         </li>
       `).join('');
     });
-    // resultsBox?.addEventListener('click', async e => {
-    //   console.group('📌 Course Result Click');
-
-    //   console.log('Click event:', e);
-
-    //   const btn = e.target.closest('button');
-    //   console.log('Clicked button:', btn);
-
-    //   if (!btn) {
-    //     console.warn('❌ No button found from click');
-    //     console.groupEnd();
-    //     return;
-    //   }
-
-    //   // ---------------------------
-    //   // Button dataset
-    //   // ---------------------------
-    //   console.group('🔹 Button Dataset');
-    //   console.log('course_id:', btn.dataset.id);
-    //   console.log('course_code:', btn.dataset.code);
-    //   console.log('template_id:', btn.dataset.templateId);
-    //   console.log('learning_mode:', btn.dataset.learningMode);
-    //   console.groupEnd();
-
-    //   // ---------------------------
-    //   // UI reset
-    //   // ---------------------------
-    //   resultsBox.innerHTML = '';
-    //   searchInput.value = btn.textContent.trim();
-
-    //   console.log('Search input set to:', searchInput.value);
-
-    //   // ---------------------------
-    //   // Hidden field updates
-    //   // ---------------------------
-    //   setAll('course_id', btn.dataset.id);
-    //   setAll('course_code', btn.dataset.code);
-    //   setAll('template_id', btn.dataset.templateId);
-    //   setAll('learning_mode', btn.dataset.learningMode);
-
-    //   console.log('✅ Hidden fields updated');
-
-    //   // ---------------------------
-    //   // Fetch course details
-    //   // ---------------------------
-    //   const url = '/schedule_gen/admin/course/get_course_details.php?id=' + btn.dataset.id;
-    //   console.log('Fetching URL:', url);
-
-    //   let res, data;
-    //   try {
-    //     res = await fetch(url);
-    //     console.log('Fetch response:', res);
-
-    //     data = await res.json();
-    //     console.log('Fetched JSON:', data);
-    //   } catch (err) {
-    //     console.error('❌ Fetch failed:', err);
-    //     console.groupEnd();
-    //     return;
-    //   }
-
-    //   lastCourseData = data;
-
-    //   // ---------------------------
-    //   // Course title
-    //   // ---------------------------
-    //   courseTitle.textContent = btn.textContent;
-    //   setAll('course_title', courseTitle.textContent.trim());
-
-    //   console.log('Course title set:', courseTitle.textContent.trim());
-
-    //   // ---------------------------
-    //   // Mode details reset
-    //   // ---------------------------
-    //   modeDetails.innerHTML = '';
-    //   console.log('Mode details cleared');
-
-    //   // ---------------------------
-    //   // Modules rendering
-    //   // ---------------------------
-    //   const mods = data?.data?.modules || [];
-
-    //   console.group('📦 Modules Data');
-    //   console.log('Module count:', mods.length);
-    //   console.table(mods);
-    //   console.groupEnd();
-
-    //   if (!mods.length) {
-    //     console.warn('⚠️ No modules found for this course');
-    //     modulesList.innerHTML =
-    //       '<li class="list-group-item text-muted">No modules found for this course.</li>';
-    //     console.groupEnd();
-    //     return;
-    //   }
-
-    //   modulesList.innerHTML = mods.map(m => {
-    //     console.log(`Rendering module: ${m.module_code}`, m);
-
-    //     return `
-    //   <li class="list-group-item d-flex align-items-center justify-content-between"
-    //       data-code="${m.module_code}"
-    //       data-title="${m.module_title}">
-    //     <div class="d-flex align-items-center justify-content-start me-2">
-    //       <div>[${m.module_code}]&nbsp;</div>
-    //       <div>${m.module_title}</div>
-    //       <input type="hidden" name="modules[]" value="${m.module_code}">
-    //       <input type="hidden" name="module_titles[${m.module_code}]" value="${m.module_title}">
-    //     </div>
-    //     <div class="btn-group">
-    //       <button type="button" class="btn btn-outline-secondary btn-sm drag-btn move-up">↑</button>
-    //       <button type="button" class="btn btn-outline-secondary btn-sm drag-btn move-down">↓</button>
-    //     </div>
-    //   </li>
-    // `;
-    //   }).join('');
-
-    //   console.log('✅ Modules rendered into DOM');
-    //   console.groupEnd();
-    // });
-
 
     // ----- Mode change -----
     modeSelect?.addEventListener('change', function() {

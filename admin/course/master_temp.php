@@ -232,7 +232,6 @@ if (isPost('saveTemplate')) {
             $session_name  = $r['session_name'] ?? '';
             $topics                = $r['topics'];
 
-
             $sessionMode  = trim($r['session_mode'] ?? '');
             $deliveryMode = trim($r['delivery_mode'] ?? '');
 

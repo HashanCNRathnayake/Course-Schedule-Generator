@@ -268,8 +268,6 @@ CREATE TABLE `template_data` (
   `topics` TEXT,
   `hours` DECIMAL(4,2) DEFAULT NULL,
   `session_type` VARCHAR(100) DEFAULT NULL,
-
-  `session_day_of_module` VARCHAR(50) DEFAULT NULL,
   `faculty` VARCHAR(255) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_template_id` (`template_id`),
