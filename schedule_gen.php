@@ -206,6 +206,7 @@ $selected = [
   'course_id'     => trim($_POST['course_id'] ?? ($_SESSION['selected']['course_id'] ?? '')),
   'course_code'   => trim($_POST['course_code'] ?? ($_SESSION['selected']['course_code'] ?? '')),
   'learning_mode' => trim($_POST['learning_mode'] ?? ($_SESSION['selected']['learning_mode'] ?? '')),
+  'template_id' => trim($_POST['template_id'] ?? ($_SESSION['selected']['template_id'] ?? '')),
   'course_title'  => trim($_POST['course_title'] ?? ($_SESSION['selected']['course_title'] ?? '')),
 ];
 
@@ -255,10 +256,30 @@ if (isPost('loadAllTemplates')) {
   $moduleTitles   = (array)($_POST['module_titles'] ?? []); // code => title
   $templateId = (int)($_POST['template_id'] ?? 0);
 
-  // echo ($templateId);
-  // var_dump ($modulesOrdered);
-  // exit;
+  // echo '<pre style="background:#111;color:#0f0;padding:15px;font-size:14px;">';
+  // echo "DEBUG POST DATA\n";
+  // echo "-----------------\n";
+  // echo "course_id:\n";
+  // var_dump($courseId);
 
+  // echo "\nlearning_mode:\n";
+  // var_dump($learningMode);
+
+  // echo "\ntemplate_id:\n";
+  // var_dump($templateId);
+
+  // echo "\nmodules (order matters):\n";
+  // var_dump($modulesOrdered);
+
+  // echo "\nmodule_titles:\n";
+  // var_dump($moduleTitles);
+
+  // echo "\nFULL \$_POST:\n";
+  // var_dump($_POST);
+
+  // echo '</pre>';
+
+  // exit; // ⛔ STOP execution here
 
   // Final grouped data: [module_code => rows[]]
   $grouped = [];
@@ -541,6 +562,8 @@ require __DIR__ . '/components/navbar.php';
         <input type="hidden" name="course_id" id="course_id" value="<?= h($selected['course_id']) ?>">
         <input type="hidden" name="course_code" id="course_code" value="<?= h($selected['course_code']) ?>">
         <input type="hidden" name="course_title" id="course_title" value="<?= h($selected['course_title']) ?>">
+        <input type="hidden" name="learning_mode" id="learning_mode" value="<?= h($selected['learning_mode']) ?>">
+        <input type="hidden" name="template_id" id="template_id" value="<?= h($selected['template_id']) ?>">
 
         <!-- Mode select -->
         <div class="col-md-3">
@@ -548,7 +571,7 @@ require __DIR__ . '/components/navbar.php';
         </div>
 
         <!-- Modules list (ordered) -->
-        <div class="col-12 mt-3">
+        <div class="col-10 mt-3">
           <label class="form-label mb-1">Modules (arrange in desired order)</label>
           <ul id="modulesList" class="list-group w-100">
             <!-- JS will populate li items (module title + code + hidden input name="modules[]") -->
@@ -559,7 +582,7 @@ require __DIR__ . '/components/navbar.php';
         </div>
 
         <!-- Load / Clear -->
-        <div class="col-12 d-flex justify-content-end mt-2">
+        <div class="col-2 d-flex justify-content-end mt-2 " id="modulesReadyBtn">
           <button class="btn btn-primary" name="loadAllTemplates" value="1" type="submit">Load</button>
           <button type="submit" name="clearCsv" value="1" class="btn btn-danger ms-1">Clear All</button>
         </div>
@@ -581,11 +604,6 @@ require __DIR__ . '/components/navbar.php';
             <label class="form-label">Sync Session Start Time</label>
             <input type="time" name="start_time" class="form-control form-control-sm" value="<?= h($meta['start_time'] ?? '') ?>" required>
           </div>
-
-          <!-- <div class="col-md-3">
-            <label class="form-label">Session End Time</label>
-            <input type="time" name="end_time" class="form-control form-control-sm" value="<?= h($meta['end_time'] ?? '') ?>" required>
-          </div> -->
 
           <div class="col-md-3">
             <label class="form-label">Module Break (days)</label>
@@ -923,11 +941,19 @@ require __DIR__ . '/components/navbar.php';
       modeDetails.innerHTML = '';
 
       // Render module ORDER list
+      const modulesReadyBtn = document.getElementById('modulesReadyBtn');
+
       const mods = data.data.modules || [];
+
       if (!mods.length) {
-        modulesList.innerHTML = '<li class="list-group-item text-muted">No modules found for this course.</li>';
+        modulesList.innerHTML =
+          '<li class="list-group-item text-muted">No modules found for this course.</li>';
+
+        // keep button hidden
+        modulesReadyBtn?.classList.add('d-none');
         return;
       }
+
 
       modulesList.innerHTML = mods.map(m => `
         <li class="list-group-item d-flex align-items-center justify-content-between"
@@ -945,127 +971,11 @@ require __DIR__ . '/components/navbar.php';
           </div>
         </li>
       `).join('');
+
+      // ✅ SHOW button now (modules are rendered)
+      modulesReadyBtn?.classList.remove('d-none');
+
     });
-    // resultsBox?.addEventListener('click', async e => {
-    //   console.group('📌 Course Result Click');
-
-    //   console.log('Click event:', e);
-
-    //   const btn = e.target.closest('button');
-    //   console.log('Clicked button:', btn);
-
-    //   if (!btn) {
-    //     console.warn('❌ No button found from click');
-    //     console.groupEnd();
-    //     return;
-    //   }
-
-    //   // ---------------------------
-    //   // Button dataset
-    //   // ---------------------------
-    //   console.group('🔹 Button Dataset');
-    //   console.log('course_id:', btn.dataset.id);
-    //   console.log('course_code:', btn.dataset.code);
-    //   console.log('template_id:', btn.dataset.templateId);
-    //   console.log('learning_mode:', btn.dataset.learningMode);
-    //   console.groupEnd();
-
-    //   // ---------------------------
-    //   // UI reset
-    //   // ---------------------------
-    //   resultsBox.innerHTML = '';
-    //   searchInput.value = btn.textContent.trim();
-
-    //   console.log('Search input set to:', searchInput.value);
-
-    //   // ---------------------------
-    //   // Hidden field updates
-    //   // ---------------------------
-    //   setAll('course_id', btn.dataset.id);
-    //   setAll('course_code', btn.dataset.code);
-    //   setAll('template_id', btn.dataset.templateId);
-    //   setAll('learning_mode', btn.dataset.learningMode);
-
-    //   console.log('✅ Hidden fields updated');
-
-    //   // ---------------------------
-    //   // Fetch course details
-    //   // ---------------------------
-    //   const url = '/schedule_gen/admin/course/get_course_details.php?id=' + btn.dataset.id;
-    //   console.log('Fetching URL:', url);
-
-    //   let res, data;
-    //   try {
-    //     res = await fetch(url);
-    //     console.log('Fetch response:', res);
-
-    //     data = await res.json();
-    //     console.log('Fetched JSON:', data);
-    //   } catch (err) {
-    //     console.error('❌ Fetch failed:', err);
-    //     console.groupEnd();
-    //     return;
-    //   }
-
-    //   lastCourseData = data;
-
-    //   // ---------------------------
-    //   // Course title
-    //   // ---------------------------
-    //   courseTitle.textContent = btn.textContent;
-    //   setAll('course_title', courseTitle.textContent.trim());
-
-    //   console.log('Course title set:', courseTitle.textContent.trim());
-
-    //   // ---------------------------
-    //   // Mode details reset
-    //   // ---------------------------
-    //   modeDetails.innerHTML = '';
-    //   console.log('Mode details cleared');
-
-    //   // ---------------------------
-    //   // Modules rendering
-    //   // ---------------------------
-    //   const mods = data?.data?.modules || [];
-
-    //   console.group('📦 Modules Data');
-    //   console.log('Module count:', mods.length);
-    //   console.table(mods);
-    //   console.groupEnd();
-
-    //   if (!mods.length) {
-    //     console.warn('⚠️ No modules found for this course');
-    //     modulesList.innerHTML =
-    //       '<li class="list-group-item text-muted">No modules found for this course.</li>';
-    //     console.groupEnd();
-    //     return;
-    //   }
-
-    //   modulesList.innerHTML = mods.map(m => {
-    //     console.log(`Rendering module: ${m.module_code}`, m);
-
-    //     return `
-    //   <li class="list-group-item d-flex align-items-center justify-content-between"
-    //       data-code="${m.module_code}"
-    //       data-title="${m.module_title}">
-    //     <div class="d-flex align-items-center justify-content-start me-2">
-    //       <div>[${m.module_code}]&nbsp;</div>
-    //       <div>${m.module_title}</div>
-    //       <input type="hidden" name="modules[]" value="${m.module_code}">
-    //       <input type="hidden" name="module_titles[${m.module_code}]" value="${m.module_title}">
-    //     </div>
-    //     <div class="btn-group">
-    //       <button type="button" class="btn btn-outline-secondary btn-sm drag-btn move-up">↑</button>
-    //       <button type="button" class="btn btn-outline-secondary btn-sm drag-btn move-down">↓</button>
-    //     </div>
-    //   </li>
-    // `;
-    //   }).join('');
-
-    //   console.log('✅ Modules rendered into DOM');
-    //   console.groupEnd();
-    // });
-
 
     // ----- Mode change -----
     modeSelect?.addEventListener('change', function() {
@@ -1217,6 +1127,40 @@ require __DIR__ . '/components/navbar.php';
       dateFormat: "H:i",
       allowInput: true // allows typing “09:00 - 12:00”
     });
+
+    (function() {
+      const socInput = document.getElementById('soc');
+      const cohortInput = document.querySelector('input[name="cohort_suffix"]');
+
+      if (!socInput || !cohortInput) return;
+
+      function updateCohortFromSOC(value) {
+        // Expecting dd/mm/yyyy
+        const parts = value.split('/');
+        if (parts.length !== 3) return;
+
+        const day = parts[0];
+        const month = parts[1];
+        const year = parts[2];
+
+        if (month.length !== 2 || year.length !== 4) return;
+
+        const suffix = month + year.slice(-2); // MMYY
+        cohortInput.value = suffix;
+      }
+
+      // When user types manually
+      socInput.addEventListener('input', e => {
+        updateCohortFromSOC(e.target.value);
+      });
+
+      // When Flatpickr selects a date
+      if (socInput._flatpickr) {
+        socInput._flatpickr.config.onChange.push(function(selectedDates, dateStr) {
+          updateCohortFromSOC(dateStr);
+        });
+      }
+    })();
   </script>
 </body>
 
